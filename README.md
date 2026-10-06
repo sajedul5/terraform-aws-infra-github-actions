@@ -205,3 +205,7 @@ curl http://$ALB_DNS
 echo "Access your application at: http://$ALB_DNS"
 ```
 
+
+## License
+
+MIT. See [LICENSE](LICENSE).
