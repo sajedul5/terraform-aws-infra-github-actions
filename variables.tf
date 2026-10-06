@@ -1,7 +1,7 @@
 variable "region" {
   description = "The AWS region to deploy the infrastructure"
   type        = string
-  default     = "us-east-1"
+  default     = "ap-southeast-2" # Sydney
 }
 
 variable "environment" {
@@ -41,15 +41,15 @@ variable "private_subnet_count" {
 }
 
 variable "availability_zones" {
-  description = "List of availability zones"
+  description = "Availability zones for the subnets. Leave empty to use the first available AZs in the region."
   type        = list(string)
-  default     = ["us-east-1a", "us-east-1b"]
+  default     = []
 }
 
 variable "ami_id" {
-  description = "AMI ID for EC2 instances"
+  description = "AMI ID for EC2 instances. Leave empty to use the latest Ubuntu 22.04 LTS AMI in the region."
   type        = string
-  default     = "ami-0c398cb65a93047f2" # Ubuntu 22.04 LTS
+  default     = ""
 }
 
 variable "instance_type" {

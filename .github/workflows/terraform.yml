@@ -15,21 +15,21 @@ on:
 
 env:
   TF_LOG: INFO
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  # BUCKET_TF_STATE: ${{ secrets.BUCKET_TF_STATE}}
+  AWS_REGION: ap-southeast-2
 
+# AWS access uses GitHub OIDC (short-lived credentials, no stored access keys).
+# Set the repository variable AWS_ROLE_ARN to the role created by bootstrap/.
+# Until it is set, only the static checks run.
 permissions:
   contents: read
+  id-token: write
   pull-requests: write
   issues: write
 
 jobs:
-  terraform-plan:
-    name: "Terraform Plan"
+  checks:
+    name: "Static Checks"
     runs-on: ubuntu-latest
-    outputs:
-      tf_workspace: ${{ steps.env-vars.outputs.tf_workspace }}
     defaults:
       run:
         shell: bash
@@ -42,6 +42,14 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.13.3
+
+      - name: Terraform Format
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
 
       - name: Setup TFLint
         uses: terraform-linters/setup-tflint@v3
@@ -67,6 +75,32 @@ jobs:
           exit-code: "0"
           ignore-unfixed: true
           severity: "CRITICAL,HIGH"
+
+  terraform-plan:
+    name: "Terraform Plan"
+    needs: checks
+    if: vars.AWS_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    outputs:
+      tf_workspace: ${{ steps.env-vars.outputs.tf_workspace }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.13.3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform Init
         id: init
@@ -171,6 +205,12 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.13.3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform Init
         run: terraform init
