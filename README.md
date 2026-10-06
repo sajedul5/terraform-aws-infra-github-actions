@@ -1,10 +1,10 @@
 # terraform-aws-infra-github-actions
-Automate AWS Infrastructure Using Terraform &amp; GitHub Actions | Real-Time Project
+Multi-environment AWS infrastructure (dev/test/prod) with Terraform and GitHub Actions. CI authenticates to AWS with OIDC, so no access keys are stored in GitHub.
 
 
 # AWS Production Infrastructure - Demo Guide
 
-## �️ Dedicated Infrastructure Repository
+## Dedicated Infrastructure Repository
 
 This repository follows the **Infrastructure as Code (IaC)** best practice of "Separation of Concerns". It is strictly dedicated to managing the AWS platform resources.
 
@@ -12,6 +12,23 @@ This repository follows the **Infrastructure as Code (IaC)** best practice of "S
 This repository uses a dedicated GitHub Actions workflow (`.github/workflows/terraform.yml`) that:
 1.  **Plans** changes on Pull Requests (with Security & Linting checks).
 2.  **Applies** changes to `dev`, `test`, or `prod` environments based on the branch.
+3.  Runs static checks (`terraform fmt`, `validate`, TFLint, Trivy) on every PR without needing AWS access.
+
+### 🔐 Keyless AWS access (OIDC)
+The pipeline holds **no AWS access keys**. GitHub Actions exchanges a short-lived OIDC token for temporary credentials by assuming an IAM role. The role's trust policy only accepts this repository's pull requests, its `main`/`test`/`dev` branches and its `dev`/`test`/`prod` environments.
+
+One-time setup (creates the OIDC provider and a scoped deploy role):
+
+```bash
+cd bootstrap
+terraform init && terraform apply
+gh variable set AWS_ROLE_ARN --body "$(terraform output -raw role_arn)"
+```
+
+Until `AWS_ROLE_ARN` is set, only the static checks run. Plan, apply and destroy are skipped, so the repo stays green without an AWS account.
+
+### 🌏 Region
+Defaults to **`ap-southeast-2` (Sydney)**. Availability zones and the Ubuntu 22.04 AMI are looked up for whatever region you choose, so changing `region` is the only edit needed.
 
 ### 🤝 Integration with Application Code
 In a real-world scenario, this repository would interface with a separate **Application Repository**:
@@ -20,7 +37,7 @@ In a real-world scenario, this repository would interface with a separate **Appl
 
 *Note: For demonstration purposes, this repo currently uses a `user_data.sh` script to bootstrap Nginx, simulating the application layer.*
 
-## �🎯 Overview
+## 🎯 Overview
 
 This demo guide walks you through deploying a production-grade 2-tier AWS infrastructure using Terraform. The infrastructure includes:
 
@@ -108,7 +125,7 @@ Create a `terraform.tfvars` file to override defaults:
 
 ```bash
 cat > terraform.tfvars << EOF
-region      = "us-east-1"
+region      = "ap-southeast-2"
 environment = "demo"
 instance_type = "t2.micro"
 min_size    = 2
@@ -173,7 +190,7 @@ After successful apply, you'll see:
 ```
 Outputs:
 
-load_balancer_dns = "app-lb-123456789.us-east-1.elb.amazonaws.com"
+load_balancer_dns = "app-lb-123456789.ap-southeast-2.elb.amazonaws.com"
 s3_bucket_name = "my-app-bucket-xxxxx"
 vpc_id = "vpc-xxxxxxxxxxxxx"
 public_subnet_ids = ["subnet-xxxxx", "subnet-yyyyy"]
